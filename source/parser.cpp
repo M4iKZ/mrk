@@ -137,10 +137,7 @@ int extractStatusCode(const std::vector<char>& response)
     {
         return std::stoi(statusCodeStr);
     }
-    catch (const std::exception& e) 
-    {
-        std::cout << "Failed to convert status code to integer: " << e.what() << std::endl;        
-    }
+    catch (const std::exception& e) {}
 
     return -1; // Invalid status code
 }
