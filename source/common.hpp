@@ -43,16 +43,14 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <unordered_map>
 
 #include "parser.hpp"
-#include "Synchronization.hpp"
 
 #include "units.hpp"
 #include "stats.hpp"
 
-using namespace Orpy;
-
-const std::string VERSION = "pre-release 0.0.1";
+const std::string VERSION = "pre-release 0.0.2";
 
 #ifdef _WIN32
 typedef SOCKET socket_t;
@@ -145,8 +143,6 @@ struct connection
 struct threadData
 {
     config cfg;
-    std::unique_ptr<ThreadPool<connection>> queue;
-    struct addrinfo* addr;
     uint64_t connections;
     uint64_t complete;
     uint64_t requests;
@@ -154,4 +150,8 @@ struct threadData
     uint64_t sent;
     std::chrono::high_resolution_clock::time_point start;
     errorsData errors;
+    fd_set fds;
+    std::vector<int> fd;
+    std::unordered_map<int, std::unique_ptr<connection>> conns;
+    socket_t max = 0;
 };

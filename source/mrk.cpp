@@ -74,9 +74,6 @@ int main(int argc, char** argv)
         
     for (auto& t : threadsData)
     {
-        t->queue->stop();
-        t->queue.reset();
-
         complete += t->complete;
         bytes += t->bytes;
         sent += t->sent;
@@ -128,26 +125,44 @@ int main(int argc, char** argv)
 
 void threadMain(uint64_t id, std::unique_ptr<threadData>& thread)
 {
-    thread->queue = std::make_unique<ThreadPool<connection>>();
-    
+    FD_ZERO(&thread->fds);
+
     for (uint64_t i = 0; i < thread->connections; ++i)
         socketConnect(thread);
-    
+
+    fd_set write_fds, read_fds;
+    FD_ZERO(&write_fds);
+    FD_ZERO(&read_fds);
+
+    struct timeval timeout;
+    timeout.tv_sec = 1; 
+    timeout.tv_usec = 0;
+
     thread->start = timeNow(RECORD_INTERVAL_MS);
 
     while (isRunning.load())
     {
-        std::unique_ptr<connection> conn = thread->queue->pop();
-        if (!conn)
+        write_fds = thread->fds;    
+        read_fds = thread->fds;    
+    
+        int ready_fds = select(thread->max + 1, &read_fds, &write_fds, NULL, &timeout);
+        if (ready_fds == -1)             
             break;
         
-        if (conn->phase == CONNECT)
-            socketCheck(thread, conn);
-        else if (conn->phase == WRITE)
-            socketWrite(thread, conn);
-        else if (conn->phase == READ)
-            socketRead(thread, conn);
-
+        for (int i = 0; i < thread->fd.size(); ++i)
+        {            
+            if (FD_ISSET(thread->fd[i], &write_fds) || FD_ISSET(thread->fd[i], &read_fds))
+            {
+                std::unique_ptr<connection>& conn = std::ref(thread->conns[thread->fd[i]]);                
+                if (conn->phase == CONNECT)
+                    socketCheck(thread, conn);
+                else if (conn->phase == WRITE)
+                    socketWrite(thread, conn);
+                else if (conn->phase == READ)
+                    socketRead(thread, conn);
+            }
+        }
+        
         if (hasTimePassed(thread->start, RECORD_INTERVAL_MS))
         {
             uint64_t elapsed_ms = getTime_us(thread->start) / 1000;
@@ -157,9 +172,7 @@ void threadMain(uint64_t id, std::unique_ptr<threadData>& thread)
 
             thread->requests = 0;
             thread->start = timeNow(RECORD_INTERVAL_MS);
-        }
-        
-        thread->queue->push(std::move(conn));
+        }        
     }
 }
 
@@ -237,13 +250,24 @@ int socketConnect(std::unique_ptr<threadData>& thread)
     conn->request = makeRequest(thread->cfg);
     conn->fd = fd;
     
-    thread->queue->push(std::move(conn));
-    
-    return 1;
+    FD_SET(fd, &thread->fds);
+
+    thread->fd.push_back(fd);
+    thread->conns.insert({ fd, std::move(conn) });
+
+    if (fd > thread->max)
+        thread->max = fd;
+        
+    return fd;
 }
 
 int socketReconnect(std::unique_ptr<threadData>& thread, std::unique_ptr<connection>& conn)
 {   
+    thread->fd.erase(std::remove(thread->fd.begin(), thread->fd.end(), conn->fd), thread->fd.end());
+    FD_CLR(conn->fd, &thread->fds);
+    
+    thread->conns.erase(conn->fd);
+    
     conn.reset();
 
     return socketConnect(thread);
