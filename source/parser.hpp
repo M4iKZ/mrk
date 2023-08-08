@@ -31,3 +31,4 @@ struct ParsedURL
 
 ParsedURL parseURL(const std::string&);
 int extractStatusCode(const std::vector<char>&);
+bool getContentLength(const std::vector<char>&, size_t&);

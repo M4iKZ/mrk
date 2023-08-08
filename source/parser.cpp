@@ -30,6 +30,8 @@ ParsedURL parseURL(const std::string& input)
                 parsedURL.host = buffer; // Captured host before
                 buffer.clear();
                 state = ParseURLState::URI;
+
+                parsedURL.uri += "/";
             }
             else
                 buffer += c;
@@ -54,6 +56,8 @@ ParsedURL parseURL(const std::string& input)
                 parsedURL.host = buffer;
                 buffer.clear();
                 state = ParseURLState::URI;
+
+                parsedURL.uri += "/";
             }
             else
                 buffer += c;
@@ -66,6 +70,8 @@ ParsedURL parseURL(const std::string& input)
                 parsedURL.port = buffer.empty() ? (parsedURL.schema == "https" ? "443" : "80") : buffer;
                 buffer.clear();
                 state = ParseURLState::URI;
+
+                parsedURL.uri += "/";
             }
             else
                 buffer += c;
@@ -140,4 +146,26 @@ int extractStatusCode(const std::vector<char>& response)
     catch (const std::exception& e) {}
 
     return -1; // Invalid status code
+}
+
+bool getContentLength(const std::vector<char>& data, size_t& headersize)
+{
+    std::string response(data.begin(), data.end());
+
+    if(!headersize)
+        headersize = response.find("\r\n\r\n") + 4; // Add Double line break size
+
+    size_t pos = response.find("Content-Length: ");
+    if (pos != std::string::npos)
+    {
+        // Extract the content length value
+        size_t valueStart = pos + strlen("Content-Length: ");
+        size_t valueEnd = response.find_first_of("\r\n", valueStart);
+        std::string contentlength = response.substr(valueStart, valueEnd - valueStart);
+
+        if (data.size() - headersize < std::stoi(contentlength))
+            return false;
+    }
+
+    return true;
 }

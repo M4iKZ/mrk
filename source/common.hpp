@@ -50,7 +50,7 @@
 #include "units.hpp"
 #include "stats.hpp"
 
-const std::string VERSION = "pre-release 0.0.2";
+const std::string VERSION = "pre-release 0.0.3";
 
 #ifdef _WIN32
 typedef SOCKET socket_t;
@@ -138,6 +138,7 @@ struct connection
     buffer headers;
     buffer body;
     std::vector<char> data;
+    size_t headersize = 0;
 };
 
 struct threadData

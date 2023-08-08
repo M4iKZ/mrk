@@ -27,6 +27,7 @@ int main(int argc, char** argv)
     }
         
     cfg.url = parseURL(url);
+
     if (cfg.url.schema == "https")
     {
         // TO DO
@@ -135,7 +136,7 @@ void threadMain(uint64_t id, std::unique_ptr<threadData>& thread)
     FD_ZERO(&read_fds);
 
     struct timeval timeout;
-    timeout.tv_sec = 1; 
+    timeout.tv_sec = 10; 
     timeout.tv_usec = 0;
 
     thread->start = timeNow(RECORD_INTERVAL_MS);
@@ -341,7 +342,11 @@ void socketRead(std::unique_ptr<threadData>& thread, std::unique_ptr<connection>
     case RETRY: 
         return;            
     }
-        
+
+    // MORE DATA INCOMING
+    if (!getContentLength(conn->data, conn->headersize)) 
+        return;
+            
     setResults(thread, conn);
 
     thread->bytes += conn->data.size();
@@ -358,6 +363,7 @@ void socketErrorConnect(uint32_t& connect)
 void setResults(std::unique_ptr<threadData>& thread, std::unique_ptr<connection>& conn)
 {   
     int status = extractStatusCode(conn->data);
+
     if (status < 0)
     {
         thread->errors.status++;
@@ -380,9 +386,10 @@ void setResults(std::unique_ptr<threadData>& thread, std::unique_ptr<connection>
     conn->phase = WRITE;
 }
 
-std::string makeRequest(const config cfg)
+std::string makeRequest(const config cfg, bool full)
 {
     std::string request; 
+
     request += "GET " + cfg.url.uri + " HTTP/1.1\r\n";
     request += "Host: " + cfg.url.host;
 
@@ -390,11 +397,14 @@ std::string makeRequest(const config cfg)
         request += ":" + cfg.url.port;
     
     request += "\r\n";
-    request += "User-Agent: mrk a HTTP benchmarking tool\r\n";
-    request += "Connection: keep-alive\r\n";
-    request += "\r\n";
 
-    return request;
+    if(full)
+    {
+        request += "User-Agent: mrk a HTTP benchmarking tool\r\n";
+        request += "Connection: keep-alive\r\n";
+    }
+        
+    return request + "\r\n";
 }
 
 void printStats(std::string name, std::unique_ptr<stats>& stats, std::string(*normalize)(long double, int))

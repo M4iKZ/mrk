@@ -26,7 +26,7 @@ void socketErrorConnect(uint32_t&);
 
 void setResults(std::unique_ptr<threadData>&, std::unique_ptr<connection>&);
 
-std::string makeRequest(const config);
+std::string makeRequest(const config, bool = false);
 
 void printStats(std::string, std::unique_ptr<stats>&, std::string(*normalize)(long double, int));
 void printUnits(long double, std::string(*normalize)(long double, int), int, int = 2);

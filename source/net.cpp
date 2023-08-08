@@ -47,7 +47,7 @@ status sockRead(std::unique_ptr<connection>& conn, size_t& n)
         ssize_t r = recv(conn->fd, chunk.data(), chunk.size(), 0);
         if (r > 0)
         {
-            conn->data.insert(conn->data.begin(), chunk.begin(), chunk.begin() + r);
+            conn->data.insert(conn->data.end(), chunk.begin(), chunk.begin() + r);
             chunk.clear();
 
             n += r;
